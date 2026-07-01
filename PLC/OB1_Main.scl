@@ -1,0 +1,377 @@
+// =====================================================================
+// OB1 - Main [Main Program Sweep (Cycle)]
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+ORGANIZATION_BLOCK "Main"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_TEMP
+    Initial_Call : Bool;   // Initial call of this OB
+    Remanence    : Bool;   // =True, if remanent data are available
+END_VAR
+
+BEGIN
+
+// -------------------------------------------------------------------
+// Network 1: AUTO/MANUAL toggle
+// Când trece în AUTO resetează toate manual enables
+// -------------------------------------------------------------------
+IF NOT "Manual_Mode_Global" THEN
+    "Manual_MC01"        := FALSE; // MC01
+    "Manual_MC02"        := FALSE; // MC02
+    "Manual_MC03"        := FALSE; // MC03
+    "Manual_MC04"        := FALSE; // MC04
+    "Manual_PickPlace1"  := FALSE; // PickPlace1
+    "Manual_PickPlace2"  := FALSE; // PickPlace2
+    "Manual_Assembly1"   := FALSE; // Assembly1
+    "Manual_Assembly2"   := FALSE; // Assembly2
+    "Manual_Conveyor"    := FALSE; // Conveyors
+END_IF;
+
+// -------------------------------------------------------------------
+// Network 2: Start-Stop program (latch SR pe StartButton Memory)
+// -------------------------------------------------------------------
+IF "Panel Principal Start Button" THEN
+    "StartButton Memory" := TRUE;
+END_IF;
+IF "Panel Principal Stop Button" THEN
+    "StartButton Memory" := FALSE;
+END_IF;
+// "Panel Principal Reset Button" - folosit local în blocurile FB, nu
+// resetează direct StartButton Memory (verifică în TIA dacă e cazul).
+
+// -------------------------------------------------------------------
+// Network 3: ConveyorsStart + Machine Centers
+// -------------------------------------------------------------------
+
+// --- Pornire conveioare principale (mod automat) ---
+IF "StartButton Memory" AND NOT "Manual_Mode_Global" THEN
+    "ConveyorPusher"    := TRUE;
+    "ConveyorPusher1"   := TRUE;
+    "ConveyorPusher2"   := TRUE;
+    "ConveyorPusher3"   := TRUE;
+    "ConveyorRemover"   := TRUE;
+    "ConveyorAssembly"  := TRUE;
+    "ConveyorAssembly1" := TRUE;
+    "ConveyotPalet3"    := TRUE;
+    "ConveyorAssembly2" := TRUE;
+    "ConveyorAssembly3" := TRUE;
+    "ConveyorCentru4"   := TRUE;
+    "ConveyorCentru5"   := TRUE;
+    "ConveyorCentru6"   := TRUE;
+    "BeltConveyorPick1" := TRUE;
+    "BeltConveyorPick2" := TRUE;
+    "BeltConveyorPick3" := TRUE;
+    "BeltConveyorPick4" := TRUE;
+    "BeltConveyorPick5" := TRUE;
+    "BeltConveyorPick6" := TRUE;
+    "BeltConveyorPick7" := TRUE;
+    "BeltConveyorPick8" := TRUE;
+ELSE
+    "ConveyorPusher"    := FALSE;
+    "ConveyorPusher1"   := FALSE;
+    "ConveyorPusher2"   := FALSE;
+    "ConveyorPusher3"   := FALSE;
+    "ConveyorRemover"   := FALSE;
+    "ConveyorAssembly"  := FALSE;
+    "ConveyorAssembly1" := FALSE;
+    "ConveyotPalet3"    := FALSE;
+    "ConveyorAssembly2" := FALSE;
+    "ConveyorAssembly3" := FALSE;
+    "ConveyorCentru4"   := FALSE;
+    "ConveyorCentru5"   := FALSE;
+    "ConveyorCentru6"   := FALSE;
+    "BeltConveyorPick1" := FALSE;
+    "BeltConveyorPick2" := FALSE;
+    "BeltConveyorPick3" := FALSE;
+    "BeltConveyorPick4" := FALSE;
+    "BeltConveyorPick5" := FALSE;
+    "BeltConveyorPick6" := FALSE;
+    "BeltConveyorPick7" := FALSE;
+    "BeltConveyorPick8" := FALSE;
+END_IF;
+
+// --- Manevrare conveioare individuale în mod Manual_Conveyor ---
+IF "Manual_Conveyor" AND "Manual_Mode_Global" THEN
+    // Manevrare individuală prin panou/HMI - releele rămân sub control extern
+    ;
+END_IF;
+
+// --- Setare viteze conveioare centru (automat) ---
+IF "StartButton Memory" AND NOT "Manual_Mode_Global" THEN
+    "Conveyor Centru2" := 2.5;
+    "Conveyor Centru3" := 2.5;
+    "Conveyor Centru1" := 2.5;
+END_IF;
+
+// --- Setare viteze conveioare centru (manual, din HMI) ---
+IF "Manual_Conveyor" AND "Manual_Mode_Global" THEN
+    "Conveyor Centru2" := "VitezaConveyor";
+    "Conveyor Centru3" := "VitezaConveyor";
+    "Conveyor Centru1" := "VitezaConveyor";
+END_IF;
+
+// --- Oprire conveioare centru (stop / oprire automată) ---
+IF NOT "StartButton Memory" AND NOT "Manual_Mode_Global" THEN
+    "Conveyor Centru2" := 0.0;
+    "Conveyor Centru3" := 0.0;
+    "Conveyor Centru1" := 0.0;
+END_IF;
+IF NOT "Manual_Conveyor" AND "Manual_Mode_Global" THEN
+    "Conveyor Centru2" := 0.0;
+    "Conveyor Centru3" := 0.0;
+    "Conveyor Centru1" := 0.0;
+END_IF;
+
+// --- Instanțe Machine Center Funtion / Machine Center Base ---
+"1-Machine Center"(
+    FCIO             := "FActoryIO Running",
+    SensorLidsIntrare := "1- SensorIntrare",
+    SensorLidsIesire  := "1- SensorIesire",
+    Machine_Error     := "1- CenterError",
+    Machine_Busy      := "1 -CenterBusy",
+    PanelStopButton   := "Panel Principal Stop Button",
+    PanelResetButton  := "Panel Principal Reset Button",
+    run               := "StartButton Memory" AND NOT "Manual_Mode_Global",
+    Conveyor_Input      => "1 - Conveyor Intrare",
+    Start_Machine        => "1 - StartButton",
+    Counter               => "1-Contor",
+    Conveyor_Output       => "1- Conveyor Iesire",
+    Stop_MachineCenter    => "1-StopButton",
+    Reset_MachineCenter   => "1-ResetButton",
+    ErrorMachine          => "ErrorMachine1");
+
+"2-Machine Center"(
+    FCIO             := "FActoryIO Running",
+    SensorLidsIntrare := "2- SensorIntrare",
+    SensorLidsIesire  := "2- SensorIesire",
+    Machine_Error     := "2- CenterError",
+    Machine_Busy      := "2 -CenterBusy",
+    PanelStopButton   := "Panel Principal Stop Button",
+    PanelResetButton  := "Panel Principal Reset Button",
+    run               := ("StartButton Memory" AND NOT "Manual_Mode_Global")
+                          OR ("Manual_MC01" AND "Manual_Mode_Global"),
+    Conveyor_Input      => "2 - Conveyor Intrare",
+    Start_Machine        => "2 - StartButton",
+    Counter               => "2-Contor",
+    Conveyor_Output       => "2- Conveyor Iesire",
+    Stop_MachineCenter    => "2-StopButton",
+    Reset_MachineCenter   => "2-ResetButton",
+    ErrorMachine          => "ErrorMachine2");
+
+"Machine Center Base_DB_1"(
+    FCIO             := "FActoryIO Running",
+    SensorLidsIntrare := "3- SensorIntrare",
+    SensorLidsIesire  := "3- SensorIesire",
+    Machine_Error     := "3- CenterError",
+    Machine_Busy      := "3 -CenterBusy",
+    PanelStopButton   := "Panel Principal Stop Button",
+    PanelResetButton  := "Panel Principal Reset Button",
+    run               := ("StartButton Memory" AND NOT "Manual_Mode_Global")
+                          OR ("Manual_MC02" AND "Manual_Mode_Global"),
+    Conveyor_Input      => "3- Conveyor Intrare",
+    Start_Machine        => "3 - StartButton",
+    Counter               => "3-Contor",
+    Conveyor_Output       => "3- Conveyor Iesire",
+    Stop_MachineCenter    => "3-StopButton",
+    Reset_MachineCenter   => "3-ResetButton");
+
+"Machine Center Base_DB"(
+    FCIO             := "FActoryIO Running",
+    SensorLidsIntrare := "4- SensorIntrare",
+    SensorLidsIesire  := "4- SensorIesire",
+    Machine_Error     := "4- CenterError",
+    Machine_Busy      := "4 -CenterBusy",
+    PanelStopButton   := "Panel Principal Stop Button",
+    PanelResetButton  := "Panel Principal Reset Button",
+    run               := ("StartButton Memory" AND NOT "Manual_Mode_Global")
+                          OR ("Manual_MC03" AND "Manual_Mode_Global"),
+    Conveyor_Input      => "4 - Conveyor Intrare",
+    Start_Machine        => "4 - StartButton",
+    Counter               => "4-Contor",
+    Conveyor_Output       => "4- Conveyor Iesire",
+    Stop_MachineCenter    => "4-StopButton",
+    Reset_MachineCenter   => "4-ResetButton");
+
+// Manual_MC04 - folosit pentru al 4-lea grup de elemente (conveioare
+// centru 4/5/6 și BeltConveyorPick1..8), vezi rungurile de mai sus.
+
+// -------------------------------------------------------------------
+// Network 4: ProductSorter + Assembly
+// -------------------------------------------------------------------
+"VisionSorter_DB"();
+
+"Assembly_DB"(
+    Capacitive_Sensor_0 := "Capacitive Sensor0",
+    Capacitive_Sensor_1 := "Capacitive Sensor1",
+    RightLimit0          := "RightLimit0",
+    RightLimit1           := "RightLimit1",
+    "Two-Axis Pick & Place 0 (Detected)" := "Two-Axis Pick & Place 0 (Detected)",
+    RightRaiseLimit0      := "Right Positioner 0 (Limit)",
+    Run                    := "StartButton Memory" AND NOT "Manual_Mode_Global",
+    Reset                  := "Panel Principal Reset Button",
+    MoveRight0              => "Right Positioner 0 (Clamp)",
+    MoveRight1               => "Right Positioner 1 (Clamp)",
+    "Two-Axis Pick & Place 0 X" => "Two-Axis Pick & Place 0 X",
+    "Two-Axis Pick & Place 0 Z" => "Two-Axis Pick & Place 0 Z",
+    "Two-Axis Pick & Place 0 (Grab)" => "Two-Axis Pick & Place 0 (Grab)",
+    RightRaise0              => "Right Positioner 0 (Raise)",
+    RollerStop0               => "RollerStop0",
+    RollerStop1               => "RollerStop1",
+    ConveyorAssembly_2         => "Conveyor Assembly1",
+    ConveyorAssembly_1         => "Conveyor Assembly");
+// notă: Run include și "Manual_Assembly1" AND "Manual_Mode_Global"
+// conform ladder-ului (contact paralel) - adaugă manual dacă lipsește
+// în semnătura generată de TIA Portal.
+
+"Assembly_DB_1"(
+    Capacitive_Sensor_0 := "Capacitive Sensor2",
+    Capacitive_Sensor_1 := "Capacitive Sensor3",
+    RightLimit0          := "LeftLimit2",
+    RightLimit1           := "leftLimit3",
+    "Two-Axis Pick & Place 0 (Detected)" := "Two-Axis Pick & Place 1 (Detected)",
+    RightRaiseLimit0      := "Left Positioner 1 (Limit)",
+    Run                    := "StartButton Memory" AND NOT "Manual_Mode_Global",
+    Reset                  := "Panel Principal Reset Button",
+    MoveRight0              => "MoveLeft2",
+    MoveRight1               => "MoveLeft3",
+    "Two-Axis Pick & Place 0 X" => "Two-Axis Pick & Place 1 X",
+    "Two-Axis Pick & Place 0 Z" => "Two-Axis Pick & Place 1 Z",
+    "Two-Axis Pick & Place 0 (Grab)" => "Two-Axis Pick & Place 1 Grab",
+    RightRaise0              => "LeftRaise1",
+    RollerStop0               => "RollerStop2",
+    RollerStop1               => "RollerStop3",
+    ConveyorAssembly_2         => "Conveyor Assembly2",
+    ConveyorAssembly_1         => "Conveyor Assembly3");
+
+// -------------------------------------------------------------------
+// Network 5/6: TurnTable
+// -------------------------------------------------------------------
+"TurnTable_DB"(
+    SensorTurnTable1                     := "Retroreflective Sensor 10",
+    "Turntable 0 (Back Limit)_1"          := "Turntable 0 (Back Limit)_1",
+    "Retroreflective Sensor 9"            := "Retroreflective Sensor 9",
+    "Retroreflective Sensor 8"            := "Retroreflective Sensor 8",
+    "Turntable 1 (Back Limit)"            := "Turntable 1 (Back Limit)",
+    "Retroreflective Sensor 11"           := "Retroreflective Sensor 11",
+    "Turntable 0 (Limit 90)"              := "Turntable 0 (Limit 90)",
+    "Turntable 1 (Front Limit)"           := "Turntable 1 (Front Limit)",
+    "Turntable 1 (Limit 90)"              := "Turntable 1 (Limit 90)",
+    "Turntable 1 (Limit 0)"               := "Turntable 1 (Limit 0)",
+    "Retroreflective Sensor 16"           := "Retroreflective Sensor 16",
+    Start                                  := "Panel Principal Start Button",
+    run                                     := "StartButton Memory",
+    "Turntable 0 Roll (-)"                  => "Turntable 0 Roll (-)",
+    "Turntable 0 Turn"                       => "Turntable 0 Turn",
+    ConveyorTurnTable                        => "ConveyorTurnTable",
+    "Turntable 0 Roll (+)"                   => "Turntable 0 Roll (+)",
+    "Turntable 1 Roll (-)"                   => "Turntable 1 Roll (-)",
+    "Turntable 1 Turn"                        => "Turntable 1 Turn",
+    ConveyorPalet3                            => "ConveyotPalet3",
+    "Turntable 1 Roll (+)"                    => "Turntable 1 Roll (+)");
+
+// -------------------------------------------------------------------
+// Network 7: PaletLogic (x2)
+// -------------------------------------------------------------------
+"PaletLogic_DB"(
+    DiffuseSensorPalet   := "DiffuseSensorPalet",
+    DiffuseSensorPalet1  := "DiffuseSensorPalet1",
+    LightEmitter          := "Light Array Emitter 2 (Value)",
+    DiffuserSensorPickUP  := "DiffuseSensorPickUp1",
+    XPosition              := "Pick & Place 1 X Position (V)",
+    YPosition              := "Pick & Place 1 Y Position (V)",
+    BoxDetected            := "Pick & Place 1 (Box Detected)",
+    ZPosition              := "Pick & Place 1 Z Position (V)",
+    "Light Array Emitter 0 (Value)" := "Light Array Emitter 0 (Value)",
+    run                     := "StartButton Memory" AND NOT "Manual_Mode_Global",
+    Reset                   := "Panel Principal Reset Button",
+    ConveyorPalet1            => "ConveyotPalet1",
+    ConveyorPalet2             => "ConveyotPalet2",
+    Emitter                     => "EmitterPalet1",
+    PositionerLeftClamp          => "Left Positioner PickUp1 (Clamp)",
+    YSetPoint                     => "Pick & Place 1 Y Set Point (V)",
+    XSetPoint                      => "Pick & Place 1 X Set Point (V)",
+    "Pick&Place Grab"                => "Pick & Place 1 Pick & Place 1 (Grab)",
+    ZSetPoint                         => "Pick & Place 1 Z Set Point (V)",
+    ConveyorPalet3                     => "ConveyotPalet3",
+    ResetButton                         => #dummy_false1);
+
+"PaletLogic_1_DB"(
+    DiffuseSensorPalet   := "DiffuseSensorPalet2",
+    DiffuseSensorPalet1  := "DiffuseSensorPalet3",
+    LightEmitter          := "Light Array Emitter 3 (Value)",
+    DiffuserSensorPickUP  := "DiffuseSensorPickUp2",
+    XPosition              := "Pick & Place 0 X Position (V)",
+    YPosition              := "Pick & Place 0 Y Position (V)",
+    BoxDetected            := "Pick & Place 0 (Box Detected)",
+    ZPosition              := "Pick & Place 0 Z Position (V)",
+    "Light Array Emitter 0 (Value)" := "Light Array Emitter 1 (Value)",
+    Reset                   := "Panel Principal Reset Button",
+    run                      := "StartButton Memory" AND NOT "Manual_Mode_Global",
+    ConveyorPalet1            => "ConveyotPalet4",
+    ConveyorPalet2             => "ConveyotPalet5",
+    Emitter                     => "EmitterPalet2",
+    PositionerLeftClamp          => "Left Positioner 4 (Clamp)",
+    YSetPoint                     => "Pick & Place 0 Y Set Point(V)",
+    XSetPoint                      => "Pick & Place 0 X Set Point(V)",
+    "Pick&Place Grab"                => "Pick & Place 0 (Grab)",
+    ZSetPoint                         => "Pick & Place 0 Z Set Point(V)",
+    ConveyorPalet3                     => "ConveyorPalet6",
+    ResetButton                         => #dummy_false2);
+
+// -------------------------------------------------------------------
+// Network 8: Stacker Crane + ConveyorStackerCrane
+// -------------------------------------------------------------------
+"Stacker Crane_DB"(
+    Start_Load_Sequance    := "At_load" AND NOT "Load1" AND NOT "Unload1",
+    Start_UnLoad_Sequance   := "At_UnLoad" AND NOT "Unload1" AND NOT "Load1",
+    At_Right                 := "At_Right",
+    At_Left                   := "At_Left",
+    At_Middle                  := "At_Middle",
+    Moving_X                    := "Moving_X",
+    Moving_Z                     := "Moving_Z",
+    Manual_Mode                   := "Manual_Mode",
+    Load_Sequence_Done              => #dummy_false3,
+    Forks_Right                       => "Fork_Right",
+    Lift                               => "Lift",
+    Target_Position                     => "TargetPosition",
+    Forks_Left                           => "Fork_Left",
+    Unload_Sequence_Done                  => #dummy_false4,
+    FreeCount                              => "Locuri Neocupate",
+    Stored_Shelf_Percent                    => "ProcentOcupare");
+
+IF "Load" THEN
+    "Load1"   := TRUE;
+    "Unload1" := FALSE;
+END_IF;
+IF "Unload" THEN
+    "Unload1" := TRUE;
+    "Load1"   := FALSE;
+END_IF;
+IF "Panel Principal Reset Button" THEN
+    "Unload1" := FALSE;
+    "Load1"   := FALSE;
+END_IF;
+
+"ConveyorStackerCrane_DB"(
+    At_Entry     := "At_entry",
+    Shelf_Value   := 0,
+    At_Load1       := "At_load",
+    At_Unload       := "At_UnLoad",
+    At_Exit          := "At_Exit",
+    run               := "StartButton Memory",
+    Entry_Conveyor      => "Entry_Conveyor",
+    Load_Conveyor         => "Load_Conveyor",
+    Unload_Conveyor         => "UnLoad_Conveyor",
+    Exit_Conveyor             => "Exit_Conveyor");
+
+// -------------------------------------------------------------------
+// Network 9: Block_1 (logică internă nedocumentată în PDF - doar apel)
+// -------------------------------------------------------------------
+"Block_1_DB"(
+    Start_Activ := "StartButton Memory",
+    Reset_Timp   := "Panel Principal Reset Button");
+
+END_ORGANIZATION_BLOCK

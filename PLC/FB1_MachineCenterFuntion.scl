@@ -1,0 +1,93 @@
+// =====================================================================
+// FB1 - Machine Center Funtion
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "Machine Center Funtion"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    FCIO              : Bool := FALSE;
+    SensorLidsIntrare : Bool := FALSE;
+    SensorLidsIesire  : Bool := FALSE;
+    Machine_Error     : Bool := FALSE;
+    Machine_Busy      : Bool := FALSE;
+    PanelStopButton   : Bool := FALSE;
+    PanelResetButton  : Bool := FALSE;
+    run               : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    Conveyor_Input       : Bool := FALSE;
+    Start_Machine         : Bool := FALSE;
+    Counter                 : DInt := 0;
+    Conveyor_Output           : Bool := FALSE;
+    Stop_MachineCenter          : Bool := FALSE;
+    Reset_MachineCenter           : Bool := FALSE;
+    ErrorMachine                    : Bool := FALSE;
+END_VAR
+
+VAR
+    "MC-0"                     : Bool := FALSE;
+    IEC_Counter_0_Instance     : CTU_INT;
+    IEC_Timer_0_Instance       : TON_TIME;
+    IEC_Timer_0_Instance_1     : TON_TIME;
+    Tag_3                      : Bool := FALSE;
+    orice                      : Bool := FALSE;
+    IEC_Counter_0_Instance_1   : CTU_INT;
+    IEC_Timer_0_Instance_2     : TP_TIME;
+END_VAR
+
+VAR_TEMP
+    Tag_5  : Bool;
+    orice1 : Bool;
+END_VAR
+
+BEGIN
+
+// Network 1: Start/Stop latch pentru starea internă a centrului
+IF "Panel Principal Start Button" THEN
+    #"MC-0" := TRUE;
+END_IF;
+IF "Panel Principal Stop Button" THEN
+    #Tag_3 := TRUE;
+END_IF;
+IF #Tag_3 THEN
+    #"MC-0" := FALSE;
+END_IF;
+
+// Network 2: Conveyor intrare activ cât timp centrul rulează
+#Conveyor_Input := #run AND #"MC-0";
+
+// Network 3: Temporizare intrare capac + condiție eroare/pornire
+#IEC_Timer_0_Instance_1(IN := #run AND #SensorLidsIntrare,
+                        PT := T#500ms);
+IF #IEC_Timer_0_Instance_1.Q THEN
+    #"MC-0" := FALSE;
+    IF NOT #Machine_Error AND NOT #Tag_3 THEN
+        #Start_Machine := TRUE;
+    END_IF;
+END_IF;
+
+IF #run AND NOT #Machine_Error AND #Start_Machine THEN
+    #ErrorMachine := TRUE;
+END_IF;
+
+// Network 4: Temporizare + contor la ieșirea centrului
+#IEC_Timer_0_Instance_2(IN := #run AND #SensorLidsIesire AND NOT #Tag_3,
+                        PT := T#5S);
+IF #run AND #SensorLidsIesire AND NOT #Tag_3 THEN
+    #"MC-0" := TRUE;
+END_IF;
+#Conveyor_Output := #IEC_Timer_0_Instance_2.Q;
+IF #Start_Machine THEN
+    #Start_Machine := FALSE;
+END_IF;
+
+#IEC_Counter_0_Instance_1(CU := #run AND #SensorLidsIesire AND NOT #Tag_3,
+                          R  := #PanelResetButton,
+                          PV := 999);
+#Counter := INT_TO_DINT(#IEC_Counter_0_Instance_1.CV);
+
+END_FUNCTION_BLOCK

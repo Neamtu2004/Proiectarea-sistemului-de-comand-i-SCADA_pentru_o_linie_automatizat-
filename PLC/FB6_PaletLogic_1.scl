@@ -1,0 +1,259 @@
+// =====================================================================
+// FB6 - PaletLogic_1
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// Structură identică cu FB5 (PaletLogic), cu alte coordonate/poziții.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "PaletLogic_1"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    DiffuseSensorPalet             : Bool := FALSE;
+    DiffuseSensorPalet1            : Bool := FALSE;
+    LightEmitter                    : DInt := 0;
+    DiffuserSensorPickUP            : Bool := FALSE;
+    XPosition                        : Real := 0.0;
+    YPosition                         : Real := 0.0;
+    BoxDetected                        : Bool := FALSE;
+    ZPosition                           : Real := 0.0;
+    "Light Array Emitter 0 (Value)"      : DInt := 0;
+    Reset                                  : Bool := FALSE;
+    run                                      : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    ConveyorPalet1        : Bool := FALSE;
+    ConveyorPalet2         : Bool := FALSE;
+    Emitter                  : Bool := FALSE;
+    PositionerLeftClamp        : Bool := FALSE;
+    YSetPoint                    : Real := 0.0;
+    XSetPoint                      : Real := 0.0;
+    "Pick&Place Grab"                : Bool := FALSE;
+    ZSetPoint                          : Real := 0.0;
+    ConveyorPalet3                       : Bool := FALSE;
+    ResetButton                            : Bool := FALSE;
+END_VAR
+
+VAR
+    IEC_Timer_0_Instance      : TP_TIME;
+    IEC_Timer_0_Instance_1     : TON_TIME;
+    IEC_Timer_0_Instance_2      : TON_TIME;
+    Step                          : Int := 0;
+    IEC_Counter_0_Instance          : CTU_INT;
+    NrPiesei                          : Int := 0;
+    R_TRIG_Instance                     : R_TRIG;
+    R_TRIG_Instance_1                     : R_TRIG;
+    Bit_0                                   : Bool := FALSE;
+    IEC_Timer_0_Instance_3                   : TP_TIME;
+END_VAR
+
+BEGIN
+
+// Network 1: Bit_0 = flag "paleta prezentă"
+IF "Panel Principal Start Button" THEN
+    #Bit_0 := TRUE;
+END_IF;
+IF #Emitter OR #ResetButton THEN
+    #Bit_0 := FALSE;
+END_IF;
+
+// Network 2: Pornire conveioare paletă
+IF #run AND #Bit_0 THEN
+    #ConveyorPalet1 := TRUE;
+    #ConveyorPalet2 := TRUE;
+    #ConveyorPalet3 := TRUE;
+END_IF;
+
+// Network 3: Resetare Bit_0 la detectarea paletei
+#IEC_Timer_0_Instance_3(IN := #run AND #DiffuseSensorPalet, PT := T#0.5S);
+IF #IEC_Timer_0_Instance_3.Q THEN
+    #Bit_0 := FALSE;
+END_IF;
+
+// Network 4: Resetare Emitter
+IF #run AND #DiffuseSensorPalet1 THEN
+    #Emitter := FALSE;
+END_IF;
+
+// Network 5: Emitter activ la LightEmitter = 128
+IF #run AND #LightEmitter = 128 AND NOT #Emitter THEN
+    #Emitter := TRUE;
+END_IF;
+
+// Network 6: Start secvență
+IF #run AND #"Light Array Emitter 0 (Value)" = 128 THEN
+    #Step := 1;
+END_IF;
+#IEC_Counter_0_Instance(CU := #run AND #"Light Array Emitter 0 (Value)" = 128,
+                        R := #ResetButton, PV := 0);
+#NrPiesei := #IEC_Counter_0_Instance.CV;
+
+// Network 7: Step 1
+#IEC_Timer_0_Instance_2(IN := #run AND #Step = 1 AND #DiffuserSensorPickUP,
+                        PT := T#0.5S);
+IF #IEC_Timer_0_Instance_2.Q THEN
+    #PositionerLeftClamp := TRUE;
+    #Step := 2;
+END_IF;
+
+// Network 8: Step 2
+IF #run AND #Step = 2 THEN
+    IF #XPosition > 3.1 AND #XPosition < 3.5
+       AND #YPosition > 2.1 AND #YPosition < 2.5 THEN
+        #Step := 3;
+    END_IF;
+    #YSetPoint := 2.3;
+    #XSetPoint := 3.3;
+END_IF;
+
+// Network 9: Step 3
+IF #run AND #Step = 3 THEN
+    IF #ZPosition > 8.2 AND #ZPosition < 8.4 AND #BoxDetected THEN
+        #"Pick&Place Grab" := TRUE;
+        #PositionerLeftClamp := FALSE;
+        #Step := 4;
+    END_IF;
+    #ZSetPoint := 8.4;
+END_IF;
+
+// Network 10: Step 4
+IF #run AND #Step = 4 THEN
+    #ZSetPoint := 1.0;
+    IF #ZPosition > 0.8 AND #ZPosition < 1.2 THEN
+        #Step := 5;
+    END_IF;
+END_IF;
+
+// Network 11: Step 5 - selectare traiectorie
+IF #run AND #Step = 5 AND #DiffuseSensorPalet THEN
+    IF #NrPiesei = 1 THEN #Step := 6;  END_IF;
+    IF #NrPiesei = 2 THEN #Step := 9;  END_IF;
+    IF #NrPiesei = 3 THEN #Step := 12; END_IF;
+    IF #NrPiesei = 4 THEN #Step := 15; END_IF;
+END_IF;
+
+// ---- Piesa Numarul 1 ----
+// Network 12: Step 6
+IF #run AND #Step = 6 AND #NrPiesei = 1 THEN
+    #XSetPoint := 9.5;
+    IF #XPosition > 9.2 AND #XPosition < 9.7 THEN
+        #Step := 7;
+    END_IF;
+END_IF;
+
+// Network 13: Step 7
+IF #run AND #Step = 7 THEN
+    #ZSetPoint := 6.2;
+    IF #ZPosition > 6.0 AND #ZPosition < 6.4 THEN
+        #"Pick&Place Grab" := FALSE;
+        #Step := 8;
+    END_IF;
+END_IF;
+
+// Network 14: Step 8
+IF #run AND #Step = 8 THEN
+    #ZSetPoint := 1.0;
+    IF #ZPosition > 0.8 AND #ZPosition < 1.2 THEN
+        #Step := 0;
+    END_IF;
+END_IF;
+
+// ---- Piesa Numarul 2 ----
+// Network 15: Step 9
+IF #run AND #Step = 9 AND #NrPiesei = 2 THEN
+    #XSetPoint := 9.5;
+    #YSetPoint := 6.1;
+    IF #XPosition > 9.2 AND #XPosition < 9.7
+       AND #YPosition > 5.9 AND #YPosition < 6.3 THEN
+        #Step := 10;
+    END_IF;
+END_IF;
+
+// Network 16: Step 10
+IF #run AND #Step = 10 THEN
+    #ZSetPoint := 6.2;
+    IF #ZPosition > 6.0 AND #ZPosition < 6.4 THEN
+        #"Pick&Place Grab" := FALSE;
+        #Step := 8;
+    END_IF;
+END_IF;
+
+// Network 17: Step 11
+IF #run AND #Step = 11 THEN
+    #ZSetPoint := 1.0;
+    IF #ZPosition > 0.8 AND #ZPosition < 1.2 THEN
+        #Step := 0;
+    END_IF;
+END_IF;
+
+// ---- Piesa Numarul 3 ----
+// Network 18: Step 12
+IF #run AND #Step = 12 AND #NrPiesei = 3 THEN
+    #XSetPoint := 7.7;
+    #YSetPoint := 6.1;
+    IF #XPosition > 7.4 AND #XPosition < 7.9
+       AND #YPosition > 5.9 AND #YPosition < 6.3 THEN
+        #Step := 13;
+    END_IF;
+END_IF;
+
+// Network 19: Step 13
+IF #run AND #Step = 13 THEN
+    #ZSetPoint := 6.2;
+    IF #ZPosition > 6.0 AND #ZPosition < 6.4 THEN
+        #"Pick&Place Grab" := FALSE;
+        #Step := 14;
+    END_IF;
+END_IF;
+
+// Network 20: Step 14
+IF #run AND #Step = 14 THEN
+    #ZSetPoint := 1.0;
+    IF #ZPosition > 0.8 AND #ZPosition < 1.2 THEN
+        #Step := 0;
+    END_IF;
+END_IF;
+
+// ---- Piesa Numarul 4 ----
+// Network 21: Step 15 (resetare NrPiesei la finalul ciclului de 4 piese)
+IF #run AND #Step = 15 AND #NrPiesei = 4 THEN
+    #XSetPoint := 7.7;
+    IF #XPosition > 7.4 AND #XPosition < 7.9 THEN
+        #Step := 16;
+        #NrPiesei := 0;
+    END_IF;
+END_IF;
+
+// Network 22: Step 16
+IF #run AND #Step = 16 THEN
+    #ZSetPoint := 6.2;
+    IF #ZPosition > 6.0 AND #ZPosition < 6.4 THEN
+        #"Pick&Place Grab" := FALSE;
+    END_IF;
+    IF #ResetButton THEN
+        #Step := 17;
+    END_IF;
+END_IF;
+
+// Network 23: Step 17
+IF #run AND #Step = 17 THEN
+    #ZSetPoint := 1.0;
+    #Bit_0 := TRUE;
+    IF #ZPosition > 0.8 THEN
+        #Step := 0;
+    END_IF;
+END_IF;
+
+// Network 24: Reset general al blocului
+IF #Reset THEN
+    #Step                := 0;
+    #XSetPoint             := 0.0;
+    #YSetPoint              := 0.0;
+    #ZSetPoint               := 0.0;
+    #ResetButton               := TRUE;
+    #"Pick&Place Grab"           := FALSE;
+    #PositionerLeftClamp           := FALSE;
+END_IF;
+
+END_FUNCTION_BLOCK

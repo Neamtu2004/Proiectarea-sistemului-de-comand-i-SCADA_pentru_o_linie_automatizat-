@@ -1,0 +1,158 @@
+// =====================================================================
+// FB7 - TurnTable
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "TurnTable"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    SensorTurnTable1                    : Bool := FALSE;
+    "Turntable 0 (Back Limit)_1"         : Bool := FALSE;
+    "Retroreflective Sensor 9"           : Bool := FALSE;
+    "Retroreflective Sensor 8"           : Bool := FALSE;
+    "Turntable 1 (Back Limit)"           : Bool := FALSE;
+    "Retroreflective Sensor 11"          : Bool := FALSE;
+    "Turntable 0 (Limit 90)"             : Bool := FALSE;
+    "Turntable 1 (Front Limit)"          : Bool := FALSE;
+    "Turntable 1 (Limit 90)"             : Bool := FALSE;
+    "Turntable 1 (Limit 0)"              : Bool := FALSE;
+    "Retroreflective Sensor 16"          : Bool := FALSE;
+    Start                                : Bool := FALSE;
+    run                                  : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    "Turntable 0 Roll (-)" : Bool := FALSE;
+    "Turntable 0 Turn"     : Bool := FALSE;
+    ConveyorTurnTable      : Bool := FALSE;
+    "Turntable 0 Roll (+)" : Bool := FALSE;
+    "Turntable 1 Roll (-)" : Bool := FALSE;
+    "Turntable 1 Turn"     : Bool := FALSE;
+    ConveyorPalet3         : Bool := FALSE;
+    "Turntable 1 Roll (+)" : Bool := FALSE;
+END_VAR
+
+VAR
+    Ocupat                 : Bool := FALSE;
+    Prioritate_B            : Bool := FALSE;
+    Prioritate_A             : Bool := FALSE;
+    IEC_Timer_0_Instance       : TP_TIME;
+    Orice                        : Bool := FALSE;
+    IEC_Timer_0_Instance_1         : TON_TIME;
+    orice1                           : Bool := FALSE;
+    IEC_Timer_0_Instance_2             : TON_TIME;
+    IEC_Timer_0_Instance_3               : TON_TIME;
+    IEC_Timer_0_Instance_4                 : TP_TIME;
+    IEC_Timer_0_Instance_5                   : TON_TIME;
+    Orice2                                     : Bool := FALSE;
+    IEC_Timer_0_Instance_6                       : TP_TIME;
+    Step                                           : Int := 0;
+    IEC_Timer_0_Instance_7                           : TON_TIME;
+    IEC_Timer_0_Instance_8                             : TON_TIME;
+END_VAR
+
+VAR_TEMP
+    mem1 : Bool;
+END_VAR
+
+BEGIN
+
+// Network 1: Alocare prioritate A/B în funcție de senzorul care a
+//            detectat primul o piesă + rutare spre conveiorul corect
+IF #run AND "Retroreflective Sensor 8" AND NOT #Ocupat THEN
+    #Prioritate_A := TRUE;
+    #Ocupat := TRUE;
+END_IF;
+IF #run AND "Retroreflective Sensor 9" AND NOT #Ocupat THEN
+    #Prioritate_B := TRUE;
+    #Ocupat := TRUE;
+END_IF;
+IF #Prioritate_B THEN
+    #ConveyorTurnTable := TRUE;
+END_IF;
+IF #Prioritate_A THEN
+    #ConveyorPalet3 := TRUE;
+END_IF;
+
+// Network 2: Pornire rutare pentru Prioritate_A
+IF #run AND #Prioritate_A THEN
+    #ConveyorPalet3 := TRUE;
+    #"Turntable 1 Roll (-)" := TRUE;
+END_IF;
+
+// Network 3: Oprire rutare Prioritate_A la ieșirea piesei (1.5s după senzor)
+#IEC_Timer_0_Instance_3(IN := #run AND #Prioritate_A
+                              AND NOT "Retroreflective Sensor 11",
+                        PT := T#1.5S);
+IF #IEC_Timer_0_Instance_3.Q THEN
+    #"Turntable 1 Roll (-)" := FALSE;
+    #Ocupat := FALSE;
+    #Prioritate_A := FALSE;
+END_IF;
+
+// Network 4: Step 0 (Prioritate_B) - pornire rotire masă turnantă 1
+IF #run AND #Prioritate_B AND #Step = 0 THEN
+    #Step := 1;
+    #"Turntable 1 Turn" := TRUE;
+    #ConveyorTurnTable := FALSE;
+END_IF;
+
+// Network 5: Step 1 - la limita de 90°, activare rulare (+) și conveior
+IF #run AND #Prioritate_B AND #Step = 1 AND "Turntable 1 (Limit 90)" THEN
+    #Step := 2;
+    #ConveyorTurnTable := TRUE;
+    #"Turntable 1 Roll (+)" := TRUE;
+END_IF;
+
+// Network 6: Step 2 - la limita frontală, resetare rulare/rotire
+IF #run AND #Prioritate_B AND #Step = 2 AND "Turntable 1 (Front Limit)" THEN
+    #Step := 3;
+    #ConveyorTurnTable := FALSE;
+    #"Turntable 1 Roll (+)" := FALSE;
+    #"Turntable 1 Turn" := FALSE;
+END_IF;
+
+// Network 7: Step 3 - revenire la poziția 0, rulare (-)
+IF #run AND #Prioritate_B AND #Step = 3 AND "Turntable 1 (Limit 0)" THEN
+    #"Turntable 1 Roll (-)" := TRUE;
+END_IF;
+
+// Network 8: Finalizare ciclu Prioritate_B (1s după senzor 11)
+#IEC_Timer_0_Instance_7(IN := #run AND #Prioritate_B
+                              AND NOT "Retroreflective Sensor 11",
+                        PT := T#1.0S);
+IF #IEC_Timer_0_Instance_7.Q THEN
+    #"Turntable 1 Roll (-)" := FALSE;
+    #Ocupat := FALSE;
+    #Prioritate_B := FALSE;
+    #Step := 0;
+END_IF;
+
+// Network 9: Masa turnantă 0 - pornire rulare (-) la detecția senzorului
+IF #run AND NOT #SensorTurnTable1 THEN
+    #"Turntable 0 Roll (-)" := TRUE;
+END_IF;
+
+// Network 10: La limita din spate, oprire rulare (-), pornire rotire
+IF #run AND #"Turntable 0 Roll (-)" AND "Turntable 0 (Back Limit)_1" THEN
+    #"Turntable 0 Roll (-)" := FALSE;
+    #"Turntable 0 Turn" := TRUE;
+END_IF;
+
+// Network 11: La limita de 90°, pornire rulare (+) și conveior masă
+IF #run AND #"Turntable 0 Turn" AND "Turntable 0 (Limit 90)" THEN
+    #"Turntable 0 Roll (+)" := TRUE;
+    #ConveyorTurnTable := TRUE;
+END_IF;
+
+// Network 12: Finalizare ciclu masă 0 (1.5s după senzorul 16)
+#IEC_Timer_0_Instance_8(IN := #run AND NOT "Retroreflective Sensor 16",
+                        PT := T#1.5S);
+IF #IEC_Timer_0_Instance_8.Q THEN
+    #"Turntable 0 Turn" := FALSE;
+    #"Turntable 0 Roll (+)" := FALSE;
+END_IF;
+
+END_FUNCTION_BLOCK

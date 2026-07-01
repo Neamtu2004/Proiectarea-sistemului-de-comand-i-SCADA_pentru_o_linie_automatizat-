@@ -1,0 +1,194 @@
+// =====================================================================
+// FB4 - Assembly
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// Secvență de tip pas-cu-pas (Step) - Grafcet implementat manual.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "Assembly"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    "Capacitive Sensor 0"                : Bool := FALSE;
+    "Capacitive Sensor 1"                : Bool := FALSE;
+    RightLimit0                          : Bool := FALSE;
+    RightLimit1                          : Bool := FALSE;
+    "Two-Axis Pick & Place 0 (Detected)" : Bool := FALSE;
+    RightRaiseLimit0                     : Bool := FALSE;
+    Run                                  : Bool := FALSE;
+    Reset                                : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    MoveRight0                       : Bool := FALSE;
+    MoveRight1                       : Bool := FALSE;
+    "Two-Axis Pick & Place 0 X"      : Bool := FALSE;
+    "Two-Axis Pick & Place 0 Z"      : Bool := FALSE;
+    "Two-Axis Pick & Place 0 (Grab)" : Bool := FALSE;
+    RightRaise0                      : Bool := FALSE;
+    RollerStop0                      : Bool := FALSE;
+    RollerStop1                      : Bool := FALSE;
+    ConveyorAssembly_2               : Bool := FALSE;
+    ConveyorAssembly_1               : Bool := FALSE;
+END_VAR
+
+VAR
+    IEC_Timer_0_Instance    : TP_TIME;
+    IEC_Timer_0_Instance_1  : TP_TIME;
+    IEC_Timer_0_Instance_2  : TON_TIME;
+    IEC_Timer_0_Instance_3  : TON_TIME;
+    IEC_Timer_0_Instance_4  : TON_TIME;
+    MemoryBit1               : Bool := FALSE;
+    MemoryBit0               : Bool := FALSE;
+    Step                       : Int := 0;
+    IEC_Timer_0_Instance_5    : TON_TIME;
+    IEC_Timer_0_Instance_6    : TON_TIME;
+    IEC_Timer_0_Instance_7    : TON_TIME;
+    IEC_Timer_0_Instance_8    : TON_TIME;
+    IEC_Timer_0_Instance_9    : TON_TIME;
+    IEC_Timer_0_Instance_10   : TON_TIME;
+    IEC_Timer_0_Instance_11   : TON_TIME;
+    IEC_Timer_0_Instance_12   : TON_TIME;
+    IEC_Timer_0_Instance_13   : TON_TIME;
+    IEC_Timer_0_Instance_14   : TON_TIME;
+    IEC_Timer_0_Instance_15   : TON_TIME;
+    IEC_Timer_0_Instance_16   : TON_TIME;
+    IEC_Timer_0_Instance_17   : TP_TIME;
+END_VAR
+
+BEGIN
+
+// Network 1: Detectare piesă pe cele două benzi (MemoryBit0/1) +
+//            oprire role (RollerStop) după 1s de la detectare
+IF #Run AND "Capacitive Sensor 0" THEN
+    #MemoryBit0 := TRUE;
+END_IF;
+IF #Run AND "Capacitive Sensor 1" THEN
+    #MemoryBit1 := TRUE;
+END_IF;
+
+IF #MemoryBit0 THEN
+    #ConveyorAssembly_1 := TRUE;
+END_IF;
+#IEC_Timer_0_Instance_15(IN := #MemoryBit0, PT := T#1S);
+IF #IEC_Timer_0_Instance_15.Q THEN
+    #RollerStop0 := TRUE;
+END_IF;
+
+IF #MemoryBit1 THEN
+    #ConveyorAssembly_2 := TRUE;
+END_IF;
+#IEC_Timer_0_Instance_16(IN := #MemoryBit1, PT := T#1S);
+IF #IEC_Timer_0_Instance_16.Q THEN
+    #RollerStop1 := TRUE;
+END_IF;
+
+// Network 2: Pornire secvență (Step 1) când ambele piese sunt prezente
+IF #Run AND #MemoryBit0 AND #MemoryBit1 THEN
+    #Step := 1;
+END_IF;
+#IEC_Timer_0_Instance_14(IN := #Run AND #MemoryBit0 AND #MemoryBit1,
+                         PT := T#1.5S);
+IF #IEC_Timer_0_Instance_14.Q THEN
+    #MemoryBit0         := FALSE;
+    #MemoryBit1          := FALSE;
+    #ConveyorAssembly_2   := FALSE;
+    #ConveyorAssembly_1    := FALSE;
+END_IF;
+
+// Network 3: Step 1 - deplasare pe orizontală până la limite
+#IEC_Timer_0_Instance_5(IN := #Run AND #Step = 1, PT := T#1.5S);
+IF #IEC_Timer_0_Instance_5.Q AND NOT #RightLimit0 THEN
+    #MoveRight0 := TRUE;
+END_IF;
+IF #RightLimit1 THEN
+    #MoveRight1 := TRUE;
+END_IF;
+
+IF #Run AND #Step = 1 AND #RightLimit0 AND #RightLimit1 THEN
+    #Step := 2;
+END_IF;
+
+// Network 4: Step 2 - avans pe axa X
+IF #Run AND #Step = 2 THEN
+    #"Two-Axis Pick & Place 0 X" := TRUE;
+END_IF;
+#IEC_Timer_0_Instance_6(IN := #Run AND #Step = 2, PT := T#1.5S);
+IF #IEC_Timer_0_Instance_6.Q THEN
+    #Step := 3;
+END_IF;
+
+// Network 5: Step 3 - coborâre pe axa Z
+IF #Run AND #Step = 3 THEN
+    #"Two-Axis Pick & Place 0 Z" := TRUE;
+END_IF;
+#IEC_Timer_0_Instance_7(IN := #Run AND #Step = 3, PT := T#1.5S);
+IF #IEC_Timer_0_Instance_7.Q THEN
+    #Step := 4;
+END_IF;
+
+// Network 6: Step 4 - prindere piesă (Grab) dacă a fost detectată
+IF #Run AND #Step = 4 AND #"Two-Axis Pick & Place 0 (Detected)" THEN
+    #"Two-Axis Pick & Place 0 (Grab)" := TRUE;
+    #Step := 5;
+END_IF;
+
+// Network 7: Step 5 - ridicare Z + revenire X
+IF #Run AND #Step = 5 THEN
+    #"Two-Axis Pick & Place 0 Z" := FALSE;
+END_IF;
+#IEC_Timer_0_Instance_3(IN := #Run AND #Step = 5, PT := T#2S);
+IF #IEC_Timer_0_Instance_3.Q THEN
+    #"Two-Axis Pick & Place 0 X" := FALSE;
+    #Step := 6;
+END_IF;
+
+// Network 8: Step 6 - coborâre Z pentru asamblare + eliberare piesă (Grab OFF)
+#IEC_Timer_0_Instance_10(IN := #Run AND #Step = 6, PT := T#1.5S);
+IF #IEC_Timer_0_Instance_10.Q THEN
+    #"Two-Axis Pick & Place 0 Z" := TRUE;
+END_IF;
+#IEC_Timer_0_Instance_4(IN := #Run AND #Step = 6, PT := T#2.5S);
+IF #IEC_Timer_0_Instance_4.Q THEN
+    #"Two-Axis Pick & Place 0 (Grab)" := FALSE;
+    #Step := 7;
+END_IF;
+
+// Network 9: Step 7 - ridicare finală Z, poziționare dreapta pentru
+//            evacuare ansamblu, resetare conveioare/role
+#IEC_Timer_0_Instance_8(IN := #Run AND #Step = 7, PT := T#1.5S);
+IF #IEC_Timer_0_Instance_8.Q THEN
+    #"Two-Axis Pick & Place 0 Z" := FALSE;
+END_IF;
+#IEC_Timer_0_Instance_17(IN := #IEC_Timer_0_Instance_8.Q, PT := T#1S);
+#RightRaise0 := #IEC_Timer_0_Instance_17.Q;
+
+IF #IEC_Timer_0_Instance_8.Q THEN
+    #MoveRight0         := FALSE;
+    #MoveRight1          := FALSE;
+    #RollerStop0          := FALSE;
+    #RollerStop1           := FALSE;
+    #ConveyorAssembly_1      := TRUE;
+    #ConveyorAssembly_2       := TRUE;
+END_IF;
+
+#IEC_Timer_0_Instance_11(IN := #IEC_Timer_0_Instance_8.Q, PT := T#3S);
+IF #IEC_Timer_0_Instance_11.Q THEN
+    #Step := 0;
+END_IF;
+
+// Network 10: Reset general al blocului
+IF #Reset THEN
+    #MemoryBit0                         := FALSE;
+    #MemoryBit1                          := FALSE;
+    #Step                                 := 0;
+    #RollerStop0                           := FALSE;
+    #RollerStop1                            := FALSE;
+    #MoveRight0                              := FALSE;
+    #MoveRight1                               := FALSE;
+    #"Two-Axis Pick & Place 0 X"               := FALSE;
+    #"Two-Axis Pick & Place 0 Z"                := FALSE;
+    #"Two-Axis Pick & Place 0 (Grab)"            := FALSE;
+END_IF;
+
+END_FUNCTION_BLOCK

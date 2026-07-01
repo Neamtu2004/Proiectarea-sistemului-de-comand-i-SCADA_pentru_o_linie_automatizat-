@@ -1,0 +1,68 @@
+// =====================================================================
+// FB3 - VisionSorter
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "VisionSorter"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR
+    Var_P0 : Bool := FALSE;
+    Var_P1 : Bool := FALSE;
+    Var_P2 : Bool := FALSE;
+    Var_P3 : Bool := FALSE;
+END_VAR
+
+VAR
+    IEC_Timer_0_DB_4 : TP_TIME; // %DB7  - Pusher1
+    IEC_Timer_0_DB   : TP_TIME; // %DB10 - Pusher2
+    IEC_Timer_0_DB_1 : TP_TIME; // %DB11 - Pusher3
+    IEC_Timer_0_DB_2 : TP_TIME; // %DB12 - Pusher4
+END_VAR
+
+BEGIN
+
+// Network 1: Setare flag sortare în funcție de valoarea senzorului de viziune
+IF "VisionSensor" = 6 THEN
+    #Var_P0 := TRUE;
+END_IF;
+IF "VisionSensor" = 5 THEN
+    #Var_P1 := TRUE;
+END_IF;
+IF "VisionSensor" = 2 THEN
+    #Var_P2 := TRUE;
+END_IF;
+IF "VisionSensor" = 3 THEN
+    #Var_P3 := TRUE;
+END_IF;
+
+// Network 2: Pusher1
+#IEC_Timer_0_DB_4(IN := #Var_P0 AND "DiffuseSensor1", PT := T#1.5S);
+"Pusher1" := #IEC_Timer_0_DB_4.Q;
+IF #IEC_Timer_0_DB_4.Q THEN
+    #Var_P0 := FALSE;
+END_IF;
+
+// Network 3: Pusher2
+#IEC_Timer_0_DB(IN := #Var_P1 AND "DiffuseSensor2", PT := T#1.5S);
+"Pusher2" := #IEC_Timer_0_DB.Q;
+IF #IEC_Timer_0_DB.Q THEN
+    #Var_P1 := FALSE;
+END_IF;
+
+// Network 4: Pusher3
+#IEC_Timer_0_DB_1(IN := #Var_P2 AND "DiffuseSensor3", PT := T#1.5S);
+"Pusher3" := #IEC_Timer_0_DB_1.Q;
+IF #IEC_Timer_0_DB_1.Q THEN
+    #Var_P2 := FALSE;
+END_IF;
+
+// Network 5: Pusher4
+#IEC_Timer_0_DB_2(IN := #Var_P3 AND "DiffuseSensor4", PT := T#1.5S);
+"Pusher4" := #IEC_Timer_0_DB_2.Q;
+IF #IEC_Timer_0_DB_2.Q THEN
+    #Var_P3 := FALSE;
+END_IF;
+
+END_FUNCTION_BLOCK

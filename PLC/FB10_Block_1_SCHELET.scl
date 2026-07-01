@@ -1,0 +1,27 @@
+// =====================================================================
+// FB10 - Block_1
+// ATENȚIE: în PDF-urile furnizate apare DOAR apelul acestui bloc din
+// OB1 (Main), NU și rețelele (Networks) interne ale blocului.
+// Interfața de mai jos e reconstruită din semnătura de apel văzută în
+// Main; LOGICA INTERNĂ TREBUIE COMPLETATĂ DE TINE (sau recuperată din
+// alt export/PDF, dacă există) - nu am de unde să o reconstitui corect.
+// Numele sugerează un bloc de temporizare/cronometrare generală a
+// ciclului de funcționare (Start_Activ / Reset_Timp).
+// =====================================================================
+FUNCTION_BLOCK "Block_1"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    Start_Activ : Bool := FALSE;
+    Reset_Timp  : Bool := FALSE;
+END_VAR
+
+BEGIN
+
+// TODO: logica internă nu a fost disponibilă în documentația furnizată.
+// Completează manual în TIA Portal (probabil un timer/cronometru total
+// de funcționare a liniei, pornit de Start_Activ și resetat de
+// Reset_Timp).
+
+END_FUNCTION_BLOCK

@@ -1,0 +1,37 @@
+// =====================================================================
+// FB9 - ConveyorStackerCrane
+// ATENȚIE: în PDF-urile furnizate apare DOAR apelul acestui bloc din
+// OB1 (Main), NU și rețelele (Networks) interne ale blocului.
+// Interfața de mai jos e reconstruită din semnătura de apel văzută în
+// Main; LOGICA INTERNĂ TREBUIE COMPLETATĂ DE TINE (sau recuperată din
+// alt export/PDF, dacă există) - nu am de unde să o reconstitui corect.
+// =====================================================================
+FUNCTION_BLOCK "ConveyorStackerCrane"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    At_Entry    : Bool := FALSE;
+    Shelf_Value : Int  := 0;
+    At_Load1    : Bool := FALSE;
+    At_Unload   : Bool := FALSE;
+    At_Exit     : Bool := FALSE;
+    run         : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    Entry_Conveyor   : Bool := FALSE;
+    Load_Conveyor    : Bool := FALSE;
+    Unload_Conveyor  : Bool := FALSE;
+    Exit_Conveyor    : Bool := FALSE;
+END_VAR
+
+BEGIN
+
+// TODO: logica internă nu a fost disponibilă în documentația furnizată.
+// Completează manual în TIA Portal pe baza comportamentului dorit
+// (probabil: pornire secvențială a benzilor Entry/Load/Unload/Exit în
+// funcție de poziția paletei/senzorii At_Entry / At_Load1 / At_Unload
+// / At_Exit, similar cu restul conveioarelor din proiect).
+
+END_FUNCTION_BLOCK

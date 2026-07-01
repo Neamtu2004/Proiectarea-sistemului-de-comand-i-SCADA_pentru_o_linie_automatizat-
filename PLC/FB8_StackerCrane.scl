@@ -1,0 +1,321 @@
+// =====================================================================
+// FB8 - Stacker Crane
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// Networks 1, 15 și 28 sunt preluate ca text SCL, așa cum apar în PDF
+// (blocul a fost scris parțial direct în SCL în proiectul original).
+// Restul rețelelor (LAD) au fost traduse în SCL echivalent.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "Stacker Crane"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    Start_Load_Sequance   : Bool := FALSE;
+    Start_UnLoad_Sequance : Bool := FALSE;
+    At_Right              : Bool := FALSE;
+    At_Left                : Bool := FALSE;
+    At_Middle                : Bool := FALSE;
+    Moving_X                  : Bool := FALSE;
+    Moving_Z                    : Bool := FALSE;
+    Manual_Mode                   : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    Load_Sequence_Done : Bool := FALSE;
+    Forks_Right          : Bool := FALSE;
+    Lift                   : Bool := FALSE;
+    Target_Position           : Int := 0;
+    Forks_Left                  : Bool := FALSE;
+    Unload_Sequence_Done          : Bool := FALSE;
+    FreeCount                       : Int := 0;
+    Stored_Shelf_Percent              : Int := 0;
+END_VAR
+
+VAR
+    Destination_Slot     : Int := 1;
+    Target_Position_1     : Bool := FALSE;
+    Manual_Mode_1           : Bool := FALSE;
+    Stored_Shelf_Value        : Int := 1;
+    Selected_Position           : Int := 1;
+    Shelf_Occupied                 : Array[1..55] of Bool;
+    Unload_Sequence_Active            : Bool := FALSE;
+    Step                                 : Int := 0;
+    Load_Sequence_Active                   : Bool := FALSE;
+    IEC_Counter_0_Instance                    : CTU_INT;
+    orice                                       : Bool := FALSE;
+    orice1                                       : Bool := FALSE;
+    orice10                                        : Bool := FALSE;
+    orice2                                          : Bool := FALSE;
+    orice3                                            : Bool := FALSE;
+    orice4                                              : Bool := FALSE;
+    pulse0                                                : Bool := FALSE;
+    IEC_Timer_0_Instance                                    : TON_TIME;
+    orice5                                                    : Bool := FALSE;
+    orice11                                                     : Bool := FALSE;
+    orice6                                                        : Bool := FALSE;
+    orice7                                                          : Bool := FALSE;
+    orice8                                                            : Bool := FALSE;
+    orice9                                                              : Bool := FALSE;
+    pulse1                                                                : Bool := FALSE;
+    trig_5                                                                  : Bool := FALSE;
+    orice12                                                                   : Bool := FALSE;
+    Unload_Shelf_Value                                                          : Int := 1;
+END_VAR
+
+VAR_TEMP
+    Temp_Ocupate : Int;
+    i            : Int;
+END_VAR
+
+BEGIN
+
+// -------------------------------------------------------------------
+// Network 1: caută primul raft liber (dacă nicio secvență nu e activă)
+// (text SCL preluat ca atare din documentația proiectului)
+// -------------------------------------------------------------------
+IF NOT #Manual_Mode_1 AND #Step = 0
+   AND NOT #Load_Sequence_Active
+   AND NOT #Unload_Sequence_Active THEN
+
+    #Stored_Shelf_Value := 1;
+    WHILE (#Stored_Shelf_Value <= 55) DO
+        IF #Shelf_Occupied[#Stored_Shelf_Value] = FALSE THEN
+            EXIT;
+        END_IF;
+        #Stored_Shelf_Value := #Stored_Shelf_Value + 1;
+    END_WHILE;
+
+    IF #Stored_Shelf_Value > 55 THEN
+        #Stored_Shelf_Value := 0;
+    ELSE
+        #Destination_Slot := #Stored_Shelf_Value;
+    END_IF;
+
+END_IF;
+
+// Network 2: Step 0 - Load Sequence Active (front la pornire secvență încărcare)
+IF #Start_Load_Sequance AND NOT #Load_Sequence_Done
+   AND NOT #Unload_Sequence_Active AND #Stored_Shelf_Value <> 0
+   AND NOT #Load_Sequence_Active AND #Step = 0 AND NOT #Manual_Mode_1 THEN
+    #Load_Sequence_Active := TRUE;
+    #Step := 1;
+END_IF;
+
+// Network 3: Step 0 - UnLoad Sequence Active
+IF #Start_UnLoad_Sequance AND NOT #Unload_Sequence_Done
+   AND NOT #Load_Sequence_Active AND #Stored_Shelf_Value <> 0
+   AND NOT #Unload_Sequence_Active AND #Step = 0 AND NOT #Manual_Mode_1 THEN
+    #Unload_Sequence_Active := TRUE;
+    #Step := 20;
+END_IF;
+
+// Network 4: Step 1 - Forks Right
+IF #Load_Sequence_Active AND #Step = 1 AND #At_Right THEN
+    #Step := 2;
+    #Forks_Right := TRUE;
+END_IF;
+
+// Network 5: Step 2 - Lift up
+IF #Load_Sequence_Active AND #Step = 2 AND #Moving_Z THEN
+    #Step := 3;
+    #Lift := TRUE;
+END_IF;
+
+// Network 6: Step 3
+IF #Load_Sequence_Active AND #Step = 3 AND #At_Middle THEN
+    #Step := 4;
+    #Forks_Right := FALSE;
+END_IF;
+
+// Network 7: Step 4
+IF #Load_Sequence_Active AND #Step = 4 AND NOT #Moving_Z THEN
+    #Step := 5;
+    #Lift := FALSE;
+END_IF;
+
+// Network 8: Step 5 - deplasare X spre poziția destinație
+IF #Load_Sequence_Active AND #Step = 5 AND NOT #Moving_X THEN
+    #Step := 6;
+END_IF;
+IF #Manual_Mode_1 THEN
+    #Destination_Slot := #Selected_Position;
+ELSE
+    #Target_Position := #Destination_Slot;
+END_IF;
+#Target_Position := #Destination_Slot;
+
+// Network 9: Step 6
+IF #Load_Sequence_Active AND #Step = 6 AND NOT #Moving_Z THEN
+    #Step := 7;
+    #Lift := TRUE;
+END_IF;
+
+// Network 10: Step 7 - Forks Left
+IF #Load_Sequence_Active AND #Step = 7 AND #At_Left THEN
+    #Step := 8;
+    #Forks_Left := TRUE;
+END_IF;
+
+// Network 11: Step 8
+IF #Load_Sequence_Active AND #Step = 8 AND #Moving_Z THEN
+    #Step := 9;
+    #Lift := FALSE;
+END_IF;
+
+// Network 12: Step 9
+IF #Load_Sequence_Active AND #Step = 9 AND #At_Middle THEN
+    #Step := 10;
+    #Forks_Left := FALSE;
+END_IF;
+
+// Network 13: Step 10 - revenire X la poziția 100 (parcare)
+IF #Load_Sequence_Active AND #Step = 10 AND NOT #Moving_X THEN
+    #Step := 11;
+    #Target_Position := 100;
+END_IF;
+
+// Network 14: Step 11 - finalizare încărcare
+IF #Load_Sequence_Active AND #Step = 11 THEN
+    #Step := 0;
+    #Manual_Mode_1 := FALSE;
+    #Load_Sequence_Done := TRUE; // impuls (pulse0) - resetează manual după un ciclu dacă e nevoie
+    #pulse0 := TRUE;
+END_IF;
+IF #Load_Sequence_Done THEN
+    #Shelf_Occupied[#Destination_Slot] := TRUE;
+END_IF;
+
+// -------------------------------------------------------------------
+// Network 15: caută ultimul raft ocupat (dacă nicio secvență nu e activă)
+// (text SCL preluat ca atare din documentația proiectului)
+// -------------------------------------------------------------------
+// Adaugă aceeași protecție ca la Network 1
+IF NOT #Manual_Mode_1 AND #Step = 0
+   AND NOT #Load_Sequence_Active
+   AND NOT #Unload_Sequence_Active THEN
+
+    #Unload_Shelf_Value := 55;
+    WHILE (#Unload_Shelf_Value >= 1) DO
+        IF #Shelf_Occupied[#Unload_Shelf_Value] = TRUE THEN
+            EXIT;
+        END_IF;
+        #Unload_Shelf_Value := #Unload_Shelf_Value - 1;
+    END_WHILE;
+
+    IF #Unload_Shelf_Value < 1 THEN
+        #Unload_Shelf_Value := 0;
+    END_IF;
+
+END_IF;
+
+// Network 16: Step 20 - Move to target position / Move X position
+IF #Unload_Sequence_Active AND #Step = 20 AND NOT #Moving_X THEN
+    #Step := 21;
+END_IF;
+IF #Manual_Mode_1 THEN
+    #Destination_Slot := #Selected_Position;
+ELSE
+    #Destination_Slot := #Unload_Shelf_Value;
+END_IF;
+#Target_Position := #Destination_Slot;
+
+// Network 17: Step 21 - Forks Left
+IF #Unload_Sequence_Active AND #Step = 21 AND #At_Left THEN
+    #Step := 22;
+    #Forks_Left := TRUE;
+END_IF;
+
+// Network 18: Step 22
+IF #Unload_Sequence_Active AND #Step = 22 AND NOT #Moving_Z THEN
+    #Step := 23;
+    #Lift := TRUE;
+END_IF;
+
+// Network 19: Step 23
+IF #Unload_Sequence_Active AND #Step = 23 AND #At_Middle THEN
+    #Step := 24;
+    #Forks_Left := FALSE;
+END_IF;
+
+// Network 20: Step 24 - eliberare raft sursă
+IF #Unload_Sequence_Active AND #Step = 24 AND NOT #Moving_Z THEN
+    #Step := 25;
+    #Lift := FALSE;
+    #Shelf_Occupied[#Destination_Slot] := FALSE;
+END_IF;
+
+// Network 21: Step 25 - deplasare X la poziția de descărcare (100)
+IF #Unload_Sequence_Active AND #Step = 25 AND NOT #Moving_X THEN
+    #Step := 26;
+END_IF;
+#Target_Position := 100;
+
+// Network 22: Step 26
+IF #Unload_Sequence_Active AND #Step = 26 AND NOT #Moving_Z THEN
+    #Step := 27;
+    #Lift := TRUE;
+END_IF;
+
+// Network 23: Step 27 - Forks Right
+IF #Unload_Sequence_Active AND #Step = 27 AND #At_Left THEN
+    #Step := 28;
+    #Forks_Left := TRUE;
+END_IF;
+
+// Network 24: Step 28
+IF #Unload_Sequence_Active AND #Step = 28 AND NOT #Moving_Z THEN
+    #Step := 29;
+    #Lift := FALSE;
+END_IF;
+
+// Network 25: Step 29
+IF #Unload_Sequence_Active AND #Step = 29 AND #At_Middle THEN
+    #Step := 30;
+    #Forks_Left := FALSE;
+END_IF;
+
+// Network 26: Step 30 - finalizare descărcare
+IF #Unload_Sequence_Active AND #Step = 30 THEN
+    #Step := 0;
+    #Manual_Mode_1 := FALSE;
+    #Unload_Sequence_Done := TRUE;
+    #pulse1 := TRUE;
+END_IF;
+IF #Unload_Sequence_Done THEN
+    #Shelf_Occupied[#Destination_Slot] := FALSE;
+END_IF;
+
+// -------------------------------------------------------------------
+// Network 28: calcul locuri libere și procent ocupare raft
+// (text SCL preluat ca atare din documentația proiectului)
+// -------------------------------------------------------------------
+// 1. Resetam contorul temporar la fiecare ciclu de scanare
+#Temp_Ocupate := 0;
+
+// 2. Numaram cate rafturi sunt ocupate fizic (verificam array-ul tau)
+FOR #i := 1 TO 54 DO
+    IF #Shelf_Occupied[#i] = TRUE THEN
+        #Temp_Ocupate := #Temp_Ocupate + 1;
+    END_IF;
+END_FOR;
+
+// 3. Calculam locurile neocupate (scriem direct in Output-ul tau)
+#FreeCount := 54 - #Temp_Ocupate;
+
+// Protectie limite (sa nu scada sub 0)
+IF #FreeCount < 0 THEN
+    #FreeCount := 0;
+END_IF;
+
+// 4. Calculam procentul de ocupare (scriem direct in Output-ul tau)
+#Stored_Shelf_Percent := (#Temp_Ocupate * 100) / 54;
+
+// Protectie limite procentaj
+IF #Stored_Shelf_Percent > 100 THEN
+    #Stored_Shelf_Percent := 100;
+ELSIF #Stored_Shelf_Percent < 0 THEN
+    #Stored_Shelf_Percent := 0;
+END_IF;
+
+END_FUNCTION_BLOCK

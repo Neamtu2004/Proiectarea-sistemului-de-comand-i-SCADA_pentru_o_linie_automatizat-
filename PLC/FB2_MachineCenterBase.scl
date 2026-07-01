@@ -1,0 +1,92 @@
+// =====================================================================
+// FB2 - Machine Center Base
+// RECONSTRUCȚIE din documentația PDF exportată din TIA Portal.
+// A se verifica / recompila în TIA Portal înainte de utilizare finală.
+// =====================================================================
+FUNCTION_BLOCK "Machine Center Base"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+VAR_INPUT
+    FCIO              : Bool := FALSE;
+    SensorLidsIntrare : Bool := FALSE;
+    SensorLidsIesire  : Bool := FALSE;
+    Machine_Error     : Bool := FALSE;
+    Machine_Busy      : Bool := FALSE;
+    PanelStopButton   : Bool := FALSE;
+    PanelResetButton  : Bool := FALSE;
+    run               : Bool := FALSE;
+END_VAR
+
+VAR_OUTPUT
+    Conveyor_Input       : Bool := FALSE;
+    Start_Machine         : Bool := FALSE;
+    Counter                 : DInt := 0;
+    Conveyor_Output           : Bool := FALSE;
+    Stop_MachineCenter          : Bool := FALSE;
+    Reset_MachineCenter           : Bool := FALSE;
+END_VAR
+
+VAR
+    IEC_Counter_0_Instance     : CTU_INT;
+    IEC_Timer_0_Instance       : TON_TIME;
+    IEC_Timer_0_Instance_1     : TON_TIME;
+    Tag_3                      : Bool := FALSE;
+    Tag_4                      : Bool := FALSE;
+    orice                      : Bool := FALSE;
+    IEC_Counter_0_Instance_1   : CTU_INT;
+    IEC_Timer_0_Instance_2     : TP_TIME;
+    IEC_Timer_0_Instance_3     : TON_TIME;
+END_VAR
+
+VAR_TEMP
+    Tag_5  : Bool;
+    orice1 : Bool;
+END_VAR
+
+BEGIN
+
+// Network 1: Start/Stop latch (Tag_4 = stare internă pornit, Tag_3 = flag stop)
+IF "Panel Principal Start Button" THEN
+    #Tag_4 := TRUE;
+END_IF;
+IF "Panel Principal Stop Button" THEN
+    #Tag_3 := TRUE;
+END_IF;
+IF #Tag_3 THEN
+    #Tag_4 := FALSE;
+END_IF;
+
+// Network 2: Conveyor intrare activ cât timp centrul rulează
+#Conveyor_Input := #run AND #Tag_4;
+
+// Network 3: Temporizare intrare capac + condiție eroare/pornire
+#IEC_Timer_0_Instance_1(IN := #run AND #SensorLidsIntrare,
+                        PT := T#500ms);
+IF #IEC_Timer_0_Instance_1.Q THEN
+    #Tag_4 := FALSE;
+    IF NOT #Machine_Error AND NOT #Tag_3 THEN
+        #Start_Machine := TRUE;
+    END_IF;
+END_IF;
+
+// Network 4: Temporizare ieșire capac + start conveior/timp de pauză
+#IEC_Timer_0_Instance_3(IN := #run AND NOT #SensorLidsIesire,
+                        PT := T#3S);
+IF #IEC_Timer_0_Instance_3.Q THEN
+    #Tag_4 := TRUE;
+END_IF;
+
+#IEC_Timer_0_Instance_2(IN := #IEC_Timer_0_Instance_3.Q, PT := T#4.5S);
+#Conveyor_Output := #IEC_Timer_0_Instance_2.Q;
+
+IF #Start_Machine THEN
+    #Start_Machine := FALSE;
+END_IF;
+
+#IEC_Counter_0_Instance_1(CU := #IEC_Timer_0_Instance_3.Q,
+                          R  := #PanelResetButton,
+                          PV := 999);
+#Counter := INT_TO_DINT(#IEC_Counter_0_Instance_1.CV);
+
+END_FUNCTION_BLOCK
