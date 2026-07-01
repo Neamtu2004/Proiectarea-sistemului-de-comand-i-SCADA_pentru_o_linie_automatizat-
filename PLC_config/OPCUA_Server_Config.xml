@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Configurație server OPC UA - RECONSTRUCȚIE
+  Nu există un export original; acest fișier e o configurație plauzibilă
+  generată pe baza tag-urilor principale identificate în program
+  (stare generală linie, contoare, poziții raft, stare manuală/automat).
+  A se ajusta/importa manual din TIA Portal:
+  Device configuration -> Properties -> OPC UA -> Server -> Export.
+-->
+<OpcUaServerConfiguration xmlns="http://www.siemens.com/automation/Openness/OpcUa">
+
+  <ServerSettings>
+    <ServerName>S7-1500_LinieAutomatizata_OPCUA</ServerName>
+    <!-- Port implicit S7-1500: 4840 -->
+    <EndpointUrl>opc.tcp://192.168.0.10:4840</EndpointUrl>
+    <ApplicationUri>urn:PLC:S71500:LinieAutomatizata</ApplicationUri>
+    <SecurityPolicy>Basic256Sha256</SecurityPolicy>
+    <SecurityMode>SignAndEncrypt</SecurityMode>
+    <!-- Pentru testare/dezvoltare se poate adăuga și un endpoint fără securitate -->
+    <AllowAnonymous>false</AllowAnonymous>
+    <MaxSessionCount>10</MaxSessionCount>
+  </ServerSettings>
+
+  <!-- Namespace-ul PLC-ului: toate tag-urile expuse sunt sub acest namespace -->
+  <Namespace index="3" uri="urn:PLC:S71500:LinieAutomatizata:DB" />
+
+  <ExposedNodes>
+
+    <!-- ===================== Stare generală linie ===================== -->
+    <Node symbol="StartButton Memory"   address="%M0.0" dataType="Bool" access="Read" />
+    <Node symbol="Manual_Mode_Global"   address="%M1.0" dataType="Bool" access="ReadWrite" />
+    <Node symbol="Panel Principal Start Button" address="%I2.1" dataType="Bool" access="Read" />
+    <Node symbol="Panel Principal Stop Button"  address="%I2.2" dataType="Bool" access="Read" />
+    <Node symbol="Panel Principal Reset Button" address="%I2.3" dataType="Bool" access="Read" />
+
+    <!-- ===================== Machine Centers 1-4 ===================== -->
+    <Node symbol="1-Contor" address="%QD20" dataType="DInt" access="Read" />
+    <Node symbol="2-Contor" address="%QD24" dataType="DInt" access="Read" />
+    <Node symbol="3-Contor" address="%QD28" dataType="DInt" access="Read" />
+    <Node symbol="4-Contor" address="%QD32" dataType="DInt" access="Read" />
+    <Node symbol="ErrorMachine1" address="%M0.5" dataType="Bool" access="Read" />
+    <Node symbol="ErrorMachine2" address="%M0.4" dataType="Bool" access="Read" />
+
+    <!-- ===================== Conveioare centru (viteze) ===================== -->
+    <Node symbol="Conveyor Centru1" address="%QD64" dataType="Real" access="ReadWrite" />
+    <Node symbol="Conveyor Centru2" address="%QD68" dataType="Real" access="ReadWrite" />
+    <Node symbol="Conveyor Centru3" address="%QD72" dataType="Real" access="ReadWrite" />
+    <Node symbol="VitezaConveyor"   address="%MD64" dataType="Real" access="ReadWrite" />
+
+    <!-- ===================== PaletLogic / PaletLogic_1 ===================== -->
+    <Node symbol="Pick & Place 1 X Position (V)" address="%ID24" dataType="Real" access="Read" />
+    <Node symbol="Pick & Place 1 Y Position (V)" address="%ID28" dataType="Real" access="Read" />
+    <Node symbol="Pick & Place 1 Z Position (V)" address="%ID32" dataType="Real" access="Read" />
+    <Node symbol="Pick & Place 0 X Position (V)" address="%ID48" dataType="Real" access="Read" />
+    <Node symbol="Pick & Place 0 Y Position (V)" address="%ID52" dataType="Real" access="Read" />
+    <Node symbol="Pick & Place 0 Z Position (V)" address="%ID56" dataType="Real" access="Read" />
+
+    <!-- ===================== Stacker Crane ===================== -->
+    <Node symbol="TargetPosition"      address="%QD60" dataType="Int"  access="Read" />
+    <Node symbol="Locuri Neocupate"    address="%QW12" dataType="Int"  access="Read" />
+    <Node symbol="ProcentOcupare"      address="%QW14" dataType="Int"  access="Read" />
+    <Node symbol="Load1"               address="%M0.2" dataType="Bool" access="Read" />
+    <Node symbol="Unload1"             address="%M0.3" dataType="Bool" access="Read" />
+    <Node symbol="Manual_Mode"         address="%I8.3" dataType="Bool" access="Read" />
+
+    <!-- ===================== VisionSorter ===================== -->
+    <Node symbol="VisionSensor" address="%ID20" dataType="DInt" access="Read" />
+
+  </ExposedNodes>
+
+  <Notes>
+    Lista de mai sus acoperă tag-urile relevante pentru monitorizare
+    externă / dashboard (stare linie, contoare, poziții, ocupare rafturi).
+    Pentru control complet din exterior (scriere), adaugă explicit
+    access="ReadWrite" doar pe tag-urile pe care vrei să le poți comanda
+    de la un client OPC UA extern (ex. VitezaConveyor, Manual_Mode_Global).
+    IMPORTANT: în TIA Portal, expunerea prin OPC UA necesită și bifarea
+    opțiunii "Accessible from OPC UA" pe fiecare tag/DB, plus activarea
+    serverului OPC UA din Device configuration -> Properties -> OPC UA.
+  </Notes>
+
+</OpcUaServerConfiguration>
